@@ -165,6 +165,10 @@ frappe.ui.form.on('Payment Entry', {
 				filters: {
 					reference_doctype: row.reference_doctype,
 					reference_name: row.reference_name,
+					company: doc.company,
+					status: ["!=", "Paid"],
+					outstanding_amount: [">", 0], // for compatibility with old data
+					docstatus: 1,
 				},
 			};
 		});
@@ -315,7 +319,7 @@ frappe.ui.form.on('Payment Entry', {
 					"from_date": frm.doc.posting_date,
 					"to_date": moment(frm.doc.modified).format('YYYY-MM-DD'),
 					"company": frm.doc.company,
-					"group_by": "",
+					"categorize_by": "",
 					"show_cancelled_entries": frm.doc.docstatus === 2
 				};
 				frappe.set_route("query-report", "General Ledger");
@@ -326,7 +330,7 @@ frappe.ui.form.on('Payment Entry', {
 	payment_type: function(frm) {
 		set_default_party_type(frm);
 		if(frm.doc.payment_type == "Internal Transfer") {
-			$.each(["party", "party_balance", "paid_from", "paid_to",
+			$.each(["party", "party_type", "party_balance", "paid_from", "paid_to",
 				"references", "total_allocated_amount"], function(i, field) {
 				frm.set_value(field, null);
 			});
@@ -1084,6 +1088,24 @@ frappe.ui.form.on('Payment Entry', {
 					if (r.message) {
 						if (!frm.doc.mode_of_payment) {
 							frm.set_value(field, r.message.account);
+						} else {
+							frappe.call({
+								method: "frappe.client.get_value",
+								args: {
+									doctype: "Mode of Payment Account",
+									filters: {
+										parent: frm.doc.mode_of_payment,
+										company: frm.doc.company,
+									},
+									fieldname: "default_account",
+									parent: "Mode of Payment",
+								},
+								callback: function (res) {
+									if (!res.message.default_account) {
+										frm.set_value(field, r.message.account);
+									}
+								},
+							});
 						}
 						frm.set_value('bank', r.message.bank);
 						frm.set_value('bank_account_no', r.message.bank_account_no);
